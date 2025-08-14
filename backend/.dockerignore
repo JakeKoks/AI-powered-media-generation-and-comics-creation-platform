@@ -1,0 +1,30 @@
+# Docker ignore file for backend
+node_modules
+npm-debug.log
+.nyc_output
+coverage
+.env.local
+.env.production
+dist
+build
+*.log
+.DS_Store
+Thumbs.db
+
+# Test files
+test-*.js
+*.test.js
+
+# Documentation
+*.md
+docs/
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo

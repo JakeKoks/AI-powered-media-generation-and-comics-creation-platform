@@ -66,16 +66,17 @@ services:
     networks:
       - ai-comics-network
 
-  # Backend API
+  # Backend API (Updated for current backend location)
   backend:
     build:
-      context: ./apps/backend
-      dockerfile: Dockerfile.dev
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: ai-comics-backend
     restart: unless-stopped
     environment:
       NODE_ENV: development
-      PORT: 4000
+      PORT: 3000
+      # Use container network - postgres is the service name
       DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/aicomics
       REDIS_URL: redis://redis:6379
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
@@ -84,18 +85,16 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin123
       MINIO_USE_SSL: false
-      CORS_ORIGIN: http://localhost:3000
+      CORS_ORIGIN: http://localhost:3001
     ports:
-      - "4000:4000"
+      - "3000:3000"
     volumes:
-      - ./apps/backend:/app
+      - ./backend:/app
       - /app/node_modules
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      minio:
         condition: service_healthy
     networks:
       - ai-comics-network

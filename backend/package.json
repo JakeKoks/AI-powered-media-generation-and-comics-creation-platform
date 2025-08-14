@@ -2,10 +2,10 @@
   "name": "ai-comics-backend",
   "version": "1.0.0",
   "description": "AI-powered comics generation backend API",
-  "main": "src/server.js",
+  "main": "src/server-v2.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "start": "node src/server-v2.js",
+    "dev": "nodemon src/server-v2.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint src/",
