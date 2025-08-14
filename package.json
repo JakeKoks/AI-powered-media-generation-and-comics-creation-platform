@@ -29,7 +29,7 @@
     "db:seed": "npm run db:seed --workspace=apps/backend",
     "db:reset": "npm run db:reset --workspace=apps/backend",
     "setup": "npm install && npm run docker:dev && npm run db:migrate && npm run db:seed",
-    "prepare": "husky install"
+    "prepare": "node -e \"process.env.NODE_ENV !== 'production' && require('husky').add('.husky/pre-commit', 'lint-staged')\" || true"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
