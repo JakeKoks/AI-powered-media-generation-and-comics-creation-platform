@@ -1,0 +1,175 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "🚀 AI Comics Platform - Infrastructure Overview",
+    "tags": ["ai-comics", "infrastructure"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "🟢 Service Health Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "green", 
+                  "value": 1
+                }
+              ]
+            },
+            "unit": "short",
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "DOWN ❌"
+                  },
+                  "1": {
+                    "text": "UP ✅"
+                  }
+                },
+                "type": "value"
+              }
+            ]
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "💾 MinIO Storage Usage",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "minio_cluster_usage_total_bytes",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 5000000000
+                },
+                {
+                  "color": "red",
+                  "value": 8000000000
+                }
+              ]
+            },
+            "unit": "bytes",
+            "min": 0,
+            "max": 10000000000
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "📊 Prometheus Targets Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "up",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "__name__": true
+              },
+              "indexByName": {},
+              "renameByName": {
+                "instance": "Service Instance",
+                "job": "Service Name",
+                "Value": "Status"
+              }
+            }
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "title": "🔥 Prometheus TSDB Stats",
+        "type": "time-series",
+        "targets": [
+          {
+            "expr": "prometheus_tsdb_symbol_table_size_bytes",
+            "refId": "A",
+            "legendFormat": "Symbol Table Size"
+          },
+          {
+            "expr": "prometheus_tsdb_head_series",
+            "refId": "B", 
+            "legendFormat": "Head Series Count"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s",
+    "version": 1
+  }
+}

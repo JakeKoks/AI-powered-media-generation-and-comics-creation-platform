@@ -1,0 +1,204 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "🎨 AI Comics Platform - Application Metrics (Ready for Backend)",
+    "tags": ["ai-comics", "application", "backend"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚀 HTTP Request Rate (req/sec)",
+        "type": "time-series",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "refId": "A",
+            "legendFormat": "{{method}} {{route}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "reqps"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "⚡ Response Time (95th Percentile)",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1
+                },
+                {
+                  "color": "red",
+                  "value": 3
+                }
+              ]
+            },
+            "unit": "s",
+            "min": 0,
+            "max": 5
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "🤖 AI Generation Metrics",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(ai_generations_total[24h])",
+            "refId": "A",
+            "legendFormat": "Images Today"
+          },
+          {
+            "expr": "rate(ai_generations_total{status=\"success\"}[5m]) / rate(ai_generations_total[5m]) * 100",
+            "refId": "B",
+            "legendFormat": "Success Rate %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 85
+                },
+                {
+                  "color": "green",
+                  "value": 95
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "title": "💾 Database Performance",
+        "type": "time-series",
+        "targets": [
+          {
+            "expr": "pg_stat_database_tup_fetched",
+            "refId": "A",
+            "legendFormat": "Rows Fetched"
+          },
+          {
+            "expr": "pg_stat_database_tup_inserted",
+            "refId": "B",
+            "legendFormat": "Rows Inserted"
+          },
+          {
+            "expr": "pg_stat_database_numbackends",
+            "refId": "C",
+            "legendFormat": "Active Connections"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 5,
+        "title": "🔴 Error Rate by Endpoint",
+        "type": "time-series",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"4..|5..\"}[5m])",
+            "refId": "A",
+            "legendFormat": "{{method}} {{route}} - {{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "reqps"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 24
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "10s",
+    "version": 1,
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "Prometheus",
+          "expr": "changes(process_start_time_seconds[1m])",
+          "iconColor": "blue",
+          "title": "Deployment"
+        }
+      ]
+    }
+  }
+}
