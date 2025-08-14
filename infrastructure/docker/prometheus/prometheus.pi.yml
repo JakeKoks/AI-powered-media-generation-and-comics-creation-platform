@@ -1,0 +1,211 @@
+# Prometheus configuration for Raspberry Pi + PC monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alerts.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 15s
+
+  # Raspberry Pi Services
+  - job_name: 'pi-backend'
+    static_configs:
+      - targets: ['backend:3000']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  - job_name: 'pi-postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    scrape_interval: 30s
+
+  - job_name: 'pi-redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+
+  - job_name: 'pi-minio'
+    static_configs:
+      - targets: ['minio:9000']
+    scrape_interval: 30s
+    metrics_path: '/minio/v2/metrics/cluster'
+
+  - job_name: 'pi-system'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+
+  # Windows PC AI Workers (Remote targets)
+  - job_name: 'pc-ai-worker'
+    static_configs:
+      - targets: ['192.168.1.100:8080']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    scrape_timeout: 5s
+
+  - job_name: 'pc-worker-metrics'
+    static_configs:
+      - targets: ['192.168.1.100:9092']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+
+  - job_name: 'pc-model-manager'
+    static_configs:
+      - targets: ['192.168.1.100:8081']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  - job_name: 'pc-image-processor'
+    static_configs:
+      - targets: ['192.168.1.100:8082']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  # AI Worker Health Monitor
+  - job_name: 'ai-worker-monitor'
+    static_configs:
+      - targets: ['ai-worker-monitor:9091']
+    scrape_interval: 30s
+
+  # Network connectivity monitoring
+  - job_name: 'blackbox-http'
+    static_configs:
+      - targets:
+        - http://192.168.1.100:8080/health  # PC AI Worker
+        - http://192.168.1.50:3001/health   # Pi Backend
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+
+    # Pi alerts
+    - alert: RaspberryPiDown
+      expr: up{job="pi-backend"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Raspberry Pi backend is down"
+        description: "The Pi backend service has been down for more than 1 minute"
+
+    - alert: PiHighCPU
+      expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle",job="pi-system"}[5m])) * 100) > 80
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage on Raspberry Pi"
+        description: "CPU usage is above 80% for more than 5 minutes"
+
+    - alert: PiHighMemory
+      expr: (1 - (node_memory_MemAvailable_bytes{job="pi-system"} / node_memory_MemTotal_bytes{job="pi-system"})) * 100 > 85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage on Raspberry Pi"
+        description: "Memory usage is above 85% for more than 5 minutes"
+
+    # PC AI Worker alerts
+    - alert: AIWorkerDown
+      expr: up{job="pc-ai-worker"} == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "AI Worker on PC is down"
+        description: "The AI generation worker has been unreachable for more than 2 minutes"
+
+    - alert: AIWorkerHighGPUTemp
+      expr: nvidia_gpu_temperature_celsius > 85
+      for: 3m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High GPU temperature on AI Worker"
+        description: "GPU temperature is above 85°C for more than 3 minutes"
+
+    - alert: AIWorkerHighGPUMemory
+      expr: (nvidia_gpu_memory_used_bytes / nvidia_gpu_memory_total_bytes) * 100 > 90
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High GPU memory usage"
+        description: "GPU memory usage is above 90% for more than 5 minutes"
+
+    - alert: AIGenerationQueueHigh
+      expr: ai_generation_queue_length > 10
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "AI generation queue is getting long"
+        description: "More than 10 jobs are waiting in the generation queue"
+
+    # Network connectivity alerts
+    - alert: PiPcConnectivityLoss
+      expr: probe_success{job="blackbox-http"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Lost connectivity between Pi and PC"
+        description: "Network connectivity between Raspberry Pi and PC has been lost"
+
+    # Database alerts
+    - alert: PostgreSQLDown
+      expr: up{job="pi-postgres"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "PostgreSQL is down"
+        description: "PostgreSQL database is not responding"
+
+    - alert: RedisDown
+      expr: up{job="pi-redis"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Redis is down"
+        description: "Redis cache service is not responding"
+
+    # Storage alerts
+    - alert: MinIODown
+      expr: up{job="pi-minio"} == 0
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "MinIO storage is down"
+        description: "MinIO object storage service is not responding"
+
+    - alert: LowDiskSpace
+      expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Low disk space"
+        description: "Disk usage is above 85%"

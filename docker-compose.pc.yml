@@ -1,0 +1,145 @@
+# Windows PC Docker Compose Configuration - AI Generation Worker
+version: '3.8'
+
+services:
+  # Main AI Generation Service
+  ai-worker:
+    build:
+      context: ./ai-worker
+      dockerfile: Dockerfile.gpu
+    container_name: ai-comics-worker-pc
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - MODEL_PATH=/models
+      - OUTPUT_PATH=/generated
+      - RASPBERRY_PI_URL=http://192.168.1.50:3001
+      - WORKER_ID=pc-main-worker
+      - MAX_CONCURRENT_JOBS=2
+      - GPU_MEMORY_FRACTION=0.9
+    volumes:
+      - ./models:/models
+      - ./generated:/generated
+      - ./cache:/cache
+      - ./logs:/app/logs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - ai-worker-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Model Management Service
+  model-manager:
+    build:
+      context: ./ai-worker/model-manager
+      dockerfile: Dockerfile
+    container_name: ai-model-manager-pc
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - MODEL_PATH=/models
+      - DOWNLOAD_PATH=/downloads
+      - HUGGINGFACE_CACHE=/cache/huggingface
+    volumes:
+      - ./models:/models
+      - ./downloads:/downloads
+      - ./cache:/cache
+    networks:
+      - ai-worker-network
+
+  # Task Queue Manager
+  task-queue:
+    image: redis:7-alpine
+    container_name: ai-task-queue-pc
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+    volumes:
+      - task_queue_data:/data
+    networks:
+      - ai-worker-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Worker Metrics Exporter
+  worker-metrics:
+    build:
+      context: ./ai-worker/metrics
+      dockerfile: Dockerfile
+    container_name: ai-metrics-exporter-pc
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    environment:
+      - NVIDIA_SMI_PATH=/usr/bin/nvidia-smi
+      - METRICS_PORT=9092
+      - WORKER_URL=http://ai-worker:8080
+    volumes:
+      - /usr/bin/nvidia-smi:/usr/bin/nvidia-smi:ro
+    networks:
+      - ai-worker-network
+    depends_on:
+      - ai-worker
+
+  # Image Processing Service
+  image-processor:
+    build:
+      context: ./ai-worker/image-processor
+      dockerfile: Dockerfile
+    container_name: ai-image-processor-pc
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - INPUT_PATH=/generated
+      - OUTPUT_PATH=/processed
+      - TEMP_PATH=/tmp/processing
+    volumes:
+      - ./generated:/generated
+      - ./processed:/processed
+      - ./tmp:/tmp/processing
+    networks:
+      - ai-worker-network
+
+  # File Server (for serving generated images to Pi)
+  file-server:
+    image: nginx:alpine
+    container_name: ai-file-server-pc
+    restart: unless-stopped
+    ports:
+      - "8083:80"
+    volumes:
+      - ./generated:/usr/share/nginx/html/generated:ro
+      - ./processed:/usr/share/nginx/html/processed:ro
+      - ./ai-worker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - ai-worker-network
+
+networks:
+  ai-worker-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+volumes:
+  task_queue_data:
+    driver: local
+  model_cache:
+    driver: local

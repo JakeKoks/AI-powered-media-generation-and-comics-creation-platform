@@ -1,0 +1,97 @@
+# Prometheus configuration for Raspberry Pi + PC monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alerts.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 15s
+
+  # Raspberry Pi Services
+  - job_name: 'pi-backend'
+    static_configs:
+      - targets: ['backend:3000']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  - job_name: 'pi-postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    scrape_interval: 30s
+
+  - job_name: 'pi-redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+
+  - job_name: 'pi-minio'
+    static_configs:
+      - targets: ['minio:9000']
+    scrape_interval: 30s
+    metrics_path: '/minio/v2/metrics/cluster'
+
+  - job_name: 'pi-system'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+
+  # Windows PC AI Workers (Remote targets)
+  - job_name: 'pc-ai-worker'
+    static_configs:
+      - targets: ['192.168.1.100:8080']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    scrape_timeout: 5s
+
+  - job_name: 'pc-worker-metrics'
+    static_configs:
+      - targets: ['192.168.1.100:9092']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+
+  - job_name: 'pc-model-manager'
+    static_configs:
+      - targets: ['192.168.1.100:8081']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  - job_name: 'pc-image-processor'
+    static_configs:
+      - targets: ['192.168.1.100:8082']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  # AI Worker Health Monitor
+  - job_name: 'ai-worker-monitor'
+    static_configs:
+      - targets: ['ai-worker-monitor:9091']
+    scrape_interval: 30s
+
+  # Network connectivity monitoring
+  - job_name: 'blackbox-http'
+    static_configs:
+      - targets:
+        - http://192.168.1.100:8080/health  # PC AI Worker
+        - http://192.168.1.50:3001/health   # Pi Backend
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

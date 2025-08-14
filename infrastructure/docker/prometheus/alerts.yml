@@ -1,0 +1,116 @@
+# Alert rules for Pi + PC distributed system
+groups:
+  - name: distributed_system_alerts
+    rules:
+      # Pi alerts
+      - alert: RaspberryPiDown
+        expr: up{job="pi-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Raspberry Pi backend is down"
+          description: "The Pi backend service has been down for more than 1 minute"
+
+      - alert: PiHighCPU
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle",job="pi-system"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on Raspberry Pi"
+          description: "CPU usage is above 80% for more than 5 minutes"
+
+      - alert: PiHighMemory
+        expr: (1 - (node_memory_MemAvailable_bytes{job="pi-system"} / node_memory_MemTotal_bytes{job="pi-system"})) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on Raspberry Pi"
+          description: "Memory usage is above 85% for more than 5 minutes"
+
+      # PC AI Worker alerts
+      - alert: AIWorkerDown
+        expr: up{job="pc-ai-worker"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI Worker on PC is down"
+          description: "The AI generation worker has been unreachable for more than 2 minutes"
+
+      - alert: AIWorkerHighGPUTemp
+        expr: nvidia_gpu_temperature_celsius > 85
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GPU temperature on AI Worker"
+          description: "GPU temperature is above 85°C for more than 3 minutes"
+
+      - alert: AIWorkerHighGPUMemory
+        expr: (nvidia_gpu_memory_used_bytes / nvidia_gpu_memory_total_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GPU memory usage"
+          description: "GPU memory usage is above 90% for more than 5 minutes"
+
+      - alert: AIGenerationQueueHigh
+        expr: ai_generation_queue_length > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI generation queue is getting long"
+          description: "More than 10 jobs are waiting in the generation queue"
+
+      # Network connectivity alerts
+      - alert: PiPcConnectivityLoss
+        expr: probe_success{job="blackbox-http"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Lost connectivity between Pi and PC"
+          description: "Network connectivity between Raspberry Pi and PC has been lost"
+
+      # Database alerts
+      - alert: PostgreSQLDown
+        expr: up{job="pi-postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database is not responding"
+
+      - alert: RedisDown
+        expr: up{job="pi-redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache service is not responding"
+
+      # Storage alerts
+      - alert: MinIODown
+        expr: up{job="pi-minio"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MinIO storage is down"
+          description: "MinIO object storage service is not responding"
+
+      - alert: LowDiskSpace
+        expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage is above 85%"

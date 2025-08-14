@@ -1,0 +1,186 @@
+# Raspberry Pi Docker Compose Configuration
+version: '3.8'
+
+services:
+  # Frontend Application
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile.pi
+    container_name: ai-comics-frontend-pi
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_API_URL=http://192.168.1.50:3001
+      - REACT_APP_WEBSOCKET_URL=ws://192.168.1.50:3001
+    networks:
+      - ai-comics-network
+    depends_on:
+      - backend
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.pi
+    container_name: ai-comics-backend-pi
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://comics_user:${DB_PASSWORD}@postgres:5432/ai_comics_db
+      - REDIS_URL=redis://redis:6379
+      - AI_WORKER_URL=http://192.168.1.100:8080
+      - JWT_SECRET=${JWT_SECRET}
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+    networks:
+      - ai-comics-network
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    volumes:
+      - ./logs:/app/logs
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-comics-db-pi
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=ai_comics_db
+      - POSTGRES_USER=comics_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/seeds:/docker-entrypoint-initdb.d/seeds
+    networks:
+      - ai-comics-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U comics_user -d ai_comics_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache & Session Store
+  redis:
+    image: redis:7-alpine
+    container_name: ai-comics-redis-pi
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - ai-comics-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "auth", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: ai-comics-minio-pi
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - ai-comics-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Grafana Monitoring
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ai-comics-grafana-pi
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SERVER_DOMAIN=${DOMAIN}
+      - GF_SERVER_ROOT_URL=https://monitoring.${DOMAIN}
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/docker/grafana/provisioning:/etc/grafana/provisioning
+      - ./infrastructure/docker/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - ai-comics-network
+    depends_on:
+      - prometheus
+
+  # Prometheus Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ai-comics-prometheus-pi
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./infrastructure/docker/prometheus/prometheus.pi.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - ai-comics-network
+
+  # AI Worker Health Monitor
+  ai-worker-monitor:
+    build:
+      context: ./monitoring
+      dockerfile: Dockerfile.worker-monitor
+    container_name: ai-worker-monitor-pi
+    restart: unless-stopped
+    environment:
+      - AI_WORKER_URLS=http://192.168.1.100:8080
+      - CHECK_INTERVAL=30
+      - PROMETHEUS_PORT=9091
+    ports:
+      - "9091:9091"
+    networks:
+      - ai-comics-network
+
+networks:
+  ai-comics-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  grafana_data:
+    driver: local
+  prometheus_data:
+    driver: local
