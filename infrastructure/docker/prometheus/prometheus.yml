@@ -1,0 +1,79 @@
+# Prometheus Configuration for AI Media & Comics Website
+
+global:
+  scrape_interval: 15s # Scrape targets every 15 seconds
+  evaluation_interval: 15s # Evaluate rules every 15 seconds
+  external_labels:
+    cluster: 'ai-comics-dev'
+    replica: 'prometheus-1'
+
+# Alertmanager configuration (optional for now)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# Scrape configuration
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 5s
+    metrics_path: /metrics
+
+  # Backend API metrics (when implemented)
+  - job_name: 'ai-comics-backend'
+    static_configs:
+      - targets: ['backend:4000']
+    scrape_interval: 10s
+    metrics_path: /metrics
+    scrape_timeout: 5s
+
+  # Frontend metrics (when implemented)
+  - job_name: 'ai-comics-frontend'
+    static_configs:
+      - targets: ['frontend:3000']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 5s
+
+  # AI Worker metrics (when implemented)
+  - job_name: 'ai-comics-ai-worker'
+    static_configs:
+      - targets: ['ai-worker:8000']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # Redis metrics (using redis_exporter - optional)
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+
+  # PostgreSQL metrics (using postgres_exporter - optional)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # MinIO metrics
+  - job_name: 'minio'
+    static_configs:
+      - targets: ['minio:9000']
+    scrape_interval: 30s
+    metrics_path: /minio/v2/metrics/cluster
+    scrape_timeout: 10s
+
+  # Docker container metrics (if cadvisor is added)
+  # - job_name: 'cadvisor'
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']
+
+# Storage configuration  
+# Note: retention settings are configured via command line flags in docker-compose.yml
